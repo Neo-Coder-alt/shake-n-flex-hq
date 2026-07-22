@@ -2,6 +2,8 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { Minus, Plus, Trash2, MapPin, Loader2, CheckCircle2, ShoppingBag } from "lucide-react";
 import { useCart } from "@/lib/cart";
+import { useSettings } from "@/lib/data/settings.service";
+import { createOrder } from "@/lib/data/order.service";
 
 export const Route = createFileRoute("/checkout")({
   head: () => ({
@@ -17,13 +19,13 @@ export const Route = createFileRoute("/checkout")({
   component: Checkout,
 });
 
-const DELIVERY_FEE = 80;
-const WHATSAPP = "923166521118";
-
 type Coords = { lat: number; lng: number } | null;
 
 function Checkout() {
   const { lines, setQty, remove, total, clear, count } = useCart();
+  const settings = useSettings();
+  const DELIVERY_FEE = settings.deliveryFee;
+  const WHATSAPP = settings.whatsapp;
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
@@ -68,6 +70,20 @@ function Checkout() {
     const mapLink = coords
       ? `https://maps.google.com/?q=${coords.lat},${coords.lng}`
       : "";
+    createOrder({
+      id,
+      createdAt: new Date().toISOString(),
+      status: "Pending",
+      customer: { name, phone, address },
+      coords,
+      notes,
+      payment,
+      lines: lines.map((l) => ({ itemId: l.item.id, name: l.item.name, qty: l.qty, price: l.item.price })),
+      subtotal: total,
+      deliveryFee: DELIVERY_FEE,
+      discount: 0,
+      total: grand,
+    });
     const orderText =
       `*New Order — Shake N Flex*\n\n` +
       `Order #: ${id}\n` +
