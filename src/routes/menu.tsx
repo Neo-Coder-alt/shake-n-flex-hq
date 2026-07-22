@@ -1,8 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { Plus, ShoppingCart } from "lucide-react";
-import { MENU, CATEGORIES } from "@/lib/menu";
 import { useCart } from "@/lib/cart";
+import { useAvailableMenu } from "@/lib/data/menu.service";
+import { useCategories } from "@/lib/data/category.service";
 
 export const Route = createFileRoute("/menu")({
   head: () => ({
@@ -25,14 +26,16 @@ export const Route = createFileRoute("/menu")({
 
 function MenuPage() {
   const { add, count, total } = useCart();
+  const menu = useAvailableMenu();
+  const categories = useCategories();
   const [active, setActive] = useState<string>("All");
 
   const filtered = useMemo(
-    () => (active === "All" ? MENU : MENU.filter((m) => m.category === active)),
-    [active],
+    () => (active === "All" ? menu : menu.filter((m) => m.category === active)),
+    [active, menu],
   );
 
-  const tabs = ["All", ...CATEGORIES];
+  const tabs = ["All", ...categories.map((c) => c.name)];
 
   return (
     <section className="mx-auto max-w-6xl px-4 py-10 md:py-14">
