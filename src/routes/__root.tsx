@@ -4,6 +4,7 @@ import {
   Link,
   createRootRouteWithContext,
   useRouter,
+  useRouterState,
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
@@ -14,6 +15,7 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 import { CartProvider } from "../lib/cart";
 import { SiteNav } from "../components/site-nav";
 import { SiteFooter } from "../components/site-footer";
+import { AdminAuthProvider } from "../lib/auth/admin-auth";
 
 function NotFoundComponent() {
   return (
@@ -127,18 +129,26 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const isAdmin = pathname === "/admin" || pathname.startsWith("/admin/");
 
   return (
     <QueryClientProvider client={queryClient}>
-      <CartProvider>
-        <div className="flex min-h-screen flex-col bg-background text-foreground">
-          <SiteNav />
-          <main className="flex-1">
+      <AdminAuthProvider>
+        <CartProvider>
+          {isAdmin ? (
             <Outlet />
-          </main>
-          <SiteFooter />
-        </div>
-      </CartProvider>
+          ) : (
+            <div className="flex min-h-screen flex-col bg-background text-foreground">
+              <SiteNav />
+              <main className="flex-1">
+                <Outlet />
+              </main>
+              <SiteFooter />
+            </div>
+          )}
+        </CartProvider>
+      </AdminAuthProvider>
     </QueryClientProvider>
   );
 }
