@@ -1,8 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Star, Truck, Sparkles, ArrowRight, Phone, Clock, MapPin } from "lucide-react";
 import heroImg from "@/assets/hero-shakes.jpg";
-import { MENU } from "@/lib/menu";
 import { useCart } from "@/lib/cart";
+import { useFeaturedMenu } from "@/lib/data/menu.service";
+import { useSettings } from "@/lib/data/settings.service";
 
 export const Route = createFileRoute("/")({
   component: Index,
@@ -10,9 +11,8 @@ export const Route = createFileRoute("/")({
 
 function Index() {
   const { add } = useCart();
-  const featured = MENU.filter((m) =>
-    ["big-bang-brownie", "the-feast-shake", "hazelnut-chocolate", "mint-margarita", "iced-latte", "strawberry-shake"].includes(m.id),
-  );
+  const settings = useSettings();
+  const featured = useFeaturedMenu().slice(0, 6);
 
   return (
     <>
@@ -44,7 +44,7 @@ function Index() {
                 Order Now <ArrowRight className="h-4 w-4" />
               </Link>
               <a
-                href="tel:+923166521118"
+                href={`tel:${settings.phone.replace(/\s+/g, "")}`}
                 className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-6 py-3 text-sm font-semibold text-foreground transition hover:border-primary hover:text-primary"
               >
                 <Phone className="h-4 w-4" /> Call to Order
