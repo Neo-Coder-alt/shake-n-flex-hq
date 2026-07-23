@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from "react";
+import { useRef, useSyncExternalStore } from "react";
 import type {
   AppState,
   Category,
@@ -209,12 +209,37 @@ export function setState(updater: (s: AppState) => AppState) {
   emit();
 }
 
+function shallowEqual(a: unknown, b: unknown): boolean {
+  if (Object.is(a, b)) return true;
+  if (typeof a !== "object" || a === null || typeof b !== "object" || b === null) return false;
+  if (Array.isArray(a) && Array.isArray(b)) {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) if (!Object.is(a[i], b[i])) return false;
+    return true;
+  }
+  const ak = Object.keys(a as Record<string, unknown>);
+  const bk = Object.keys(b as Record<string, unknown>);
+  if (ak.length !== bk.length) return false;
+  for (const k of ak) {
+    if (!Object.is((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k])) return false;
+  }
+  return true;
+}
+
 export function useAppState<T>(selector: (s: AppState) => T): T {
-  return useSyncExternalStore(
-    subscribe,
-    () => selector(state),
-    () => selector(state),
-  );
+  const cacheRef = useRef<{ state: AppState; value: T } | null>(null);
+  const getSnapshot = () => {
+    const cache = cacheRef.current;
+    if (cache && cache.state === state) return cache.value;
+    const next = selector(state);
+    if (cache && shallowEqual(cache.value, next)) {
+      cacheRef.current = { state, value: cache.value };
+      return cache.value;
+    }
+    cacheRef.current = { state, value: next };
+    return next;
+  };
+  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 }
 
 export function resetStore() {
