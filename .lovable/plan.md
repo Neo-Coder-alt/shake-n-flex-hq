@@ -1,68 +1,61 @@
+# Migrate Shake N Flex to Lovable Cloud
 
-# Admin Dashboard for Shake N Flex
+Replace the `localStorage` store with real Supabase tables, auth, and storage while keeping every component's public API (`useMenu`, `useCategories`, etc.) the same so the website UI and admin UI don't change.
 
-Build the admin panel inside the existing project (no separate app). The customer site keeps working exactly as-is; the only change on the customer side is that pages read from a shared data service instead of hardcoded arrays, so future admin edits reflect automatically.
+## 1. Database schema (single migration)
 
-Backend for now = a typed mock data service persisted to `localStorage`, structured so swapping to Lovable Cloud (Supabase) later means only replacing the service implementations. When you're ready to make it real (real logins, cross-device data, image uploads), I'll enable Lovable Cloud.
+Tables in `public`, all with `id uuid pk default gen_random_uuid()`, `created_at timestamptz default now()`, `updated_at timestamptz default now()` + auto-update trigger, RLS enabled, GRANTs.
 
-## Architecture
+- `categories` — name, slug (unique). Public read, admin write.
+- `menu` — name, description, price, category (fk categories.slug), image, sizes jsonb, toppings jsonb, featured, available, out_of_stock. Public read where `available`. Admin write.
+- `orders` — customer_name, phone, address, lat, lng, items jsonb, subtotal, delivery_fee, discount, total, status, notes, coupon_code. Anyone can insert (guest checkout). Admin read/update/delete.
+- `reviews` — name, rating, text, pinned, reply. Public read + insert. Admin update/delete.
+- `coupons` — code (unique), type, value, expires_at, active. Public read active (for validate). Admin write.
+- `website_settings` — singleton row keyed on `id='global'` with jsonb `data` (brand, hours, WhatsApp, delivery fee, socials, gallery). Public read, admin write.
+- `profiles` — `id uuid pk references auth.users(id)`, email, name, avatar_url. Trigger on `auth.users` insert auto-creates row.
+- `user_roles` + `app_role` enum (`admin`, `user`) + `has_role(uuid, app_role)` security-definer fn. Used by all admin RLS policies.
 
-```text
-src/
-  lib/
-    data/
-      types.ts            shared types (MenuItem, Category, Order, Review, Coupon, Settings, AdminUser)
-      store.ts            localStorage-backed reactive store + seed from current menu
-      menu.service.ts     list/get/create/update/delete/toggle featured/stock
-      category.service.ts CRUD
-      order.service.ts    list/filter/updateStatus/delete + createFromCart (used by checkout)
-      review.service.ts   list/create/delete/pin/reply
-      coupon.service.ts   CRUD + validate(code)
-      settings.service.ts get/update site settings (brand, hours, WhatsApp, delivery fee, socials)
-      analytics.service.ts derived metrics from orders
-    auth/
-      admin-auth.tsx      mock admin auth context (email+password, remember me, logout)
-  components/admin/       Sidebar, Topbar, StatCard, DataTable, FormField, ImageUploader, etc.
-  routes/
-    admin.tsx             /admin login (redirects to /admin/dashboard if signed in)
-    _admin.tsx            pathless layout — guards + renders admin shell
-    _admin/dashboard.tsx  KPIs + charts (recharts, already installed via shadcn)
-    _admin/menu.tsx       menu CRUD
-    _admin/categories.tsx category CRUD
-    _admin/orders.tsx     orders list, filters, status updates, detail drawer
-    _admin/reviews.tsx    reviews moderation
-    _admin/coupons.tsx    coupon CRUD
-    _admin/analytics.tsx  revenue/orders/best sellers charts
-    _admin/settings.tsx   site settings + gallery (hero, promos)
-    _admin/profile.tsx    admin profile + change password
-```
+Storage: `menu-images` bucket (public read, admin write).
 
-Customer routes (`/`, `/menu`, `/checkout`) switch to reading from `menu.service` / `settings.service` and orders are written via `order.service.createFromCart` (still opens WhatsApp — nothing removed).
+## 2. Auth
 
-## Auth (mock, swap-ready)
+- Replace mock `admin-auth.tsx` with Supabase `signInWithPassword` / `signOut` / `resetPasswordForEmail` / `updateUser`.
+- Add `/reset-password` public route.
+- `_authenticated` gate not used — admin routes stay under `/admin/*` and check `useAdminAuth()` + `has_role('admin')` client-side; server-side protection lives in RLS.
+- First admin: user signs up via Supabase, then a one-off SQL inserts their row into `user_roles`. I'll surface this in the plan output.
 
-- Seeded admin: `admin@shakenflex.pk` / `admin123` (shown once in-app; change on first login).
-- Context provides `signIn`, `signOut`, `requestPasswordReset` (mock — shows a toast with reset token), `updatePassword`.
-- `_admin.tsx` `beforeLoad` redirects to `/admin` when not signed in; `/admin` redirects to `/admin/dashboard` when signed in.
-- "Remember me" toggles `localStorage` vs `sessionStorage` for the session.
+## 3. Service layer
 
-## Dashboard
+Keep every exported function name (`useMenu`, `upsertMenuItem`, `useOrders`, `createOrder`, `validateCoupon`, `useSettings`, etc.). Internally:
 
-Stat cards: Total Orders, Today's Orders, Revenue, Pending, Completed, Best Seller, Avg Rating.
-Charts (recharts): Sales over last 14 days (area), Orders by status (bar), Top 5 products (bar).
+- Rewrite each `*.service.ts` to use `@tanstack/react-query` with `supabase` client. Hooks return the same shapes; mutation helpers call `.from(...).insert/update/delete`.
+- Delete `src/lib/data/store.ts` (localStorage store) once services no longer depend on it.
+- `analytics.service.ts` derives from orders via a react-query hook.
 
-## Menu / Categories / Orders / Reviews / Coupons / Settings / Analytics / Profile
+## 4. Image uploads
 
-All the listed CRUD + toggles, driven by the services. Images stored as data URLs in mock mode (uploader accepts file → base64) so switching to Supabase Storage later is a single method change.
+Replace `ImageUploader` base64 flow with `supabase.storage.from('menu-images').upload(...)` returning a public URL.
 
-Notifications: bell in topbar reads a derived feed (new orders, new reviews, out-of-stock items, expired coupons).
+## 5. Customer site
 
-## Design
+No visual change. `index.tsx`, `menu.tsx`, `checkout.tsx` already call the hooks — they keep working because hook signatures are preserved.
 
-Reuses the existing blue/white tokens in `src/styles.css` — no theme changes. Admin shell = fixed sidebar (collapsible on mobile via `Sheet`), sticky topbar, soft-shadow cards, rounded-xl, subtle motion on hover/route-change. Fully responsive.
+## 6. Wiring
 
-## Scope note
+- Add react-query provider to root (already installed).
+- Seed initial data (categories + settings row) in the migration.
 
-This is a large build. I'll ship it in one pass focused on structure + working flows end-to-end with mock data. Once you're happy with the shape, say the word and I'll enable Lovable Cloud and port the services to real Supabase tables + RLS + storage + real auth.
+## Technical notes
 
-Approve and I'll build it.
+- All admin RLS policies gate on `public.has_role(auth.uid(), 'admin')`.
+- `orders.status` uses text enum-like check constraint.
+- `website_settings` uses singleton pattern; `useSettings()` fetches by id.
+- One database migration for schema + seed. Storage bucket created via storage tool.
+
+## Out of scope
+
+- Realtime subscriptions (not requested).
+- Migrating existing localStorage data to Supabase (starts fresh; seed provides defaults).
+- OAuth providers (email/password only per current admin flow).
+
+Approve and I'll build it end to end.

@@ -24,7 +24,12 @@ export type Category = {
   slug: string;
 };
 
-export type OrderStatus = "Pending" | "Preparing" | "Ready" | "Completed" | "Cancelled";
+export type OrderStatus =
+  | "Pending"
+  | "Preparing"
+  | "Ready"
+  | "Completed"
+  | "Cancelled";
 
 export type OrderLine = {
   itemId: string;
@@ -82,6 +87,22 @@ export type SiteSettings = {
   deliveryFee: number;
   social: { instagram: string; facebook: string };
   gallery: string[];
+};
+
+export const DEFAULT_SETTINGS: SiteSettings = {
+  brandName: "Shake N Flex",
+  tagline: "Drink & Relax",
+  about:
+    "Fresh juices, thick shakes and specialty coffees blended daily in Nazimabad, Karachi.",
+  phone: "+92 316 6521118",
+  whatsapp: "923166521118",
+  email: "hello@shakenflex.pk",
+  address:
+    "Adjacent to Bina Beauty Parlour, Block 4, Nazimabad No. 4, Karachi 74600",
+  hours: "4 PM – 1:30 AM",
+  deliveryFee: 100,
+  social: { instagram: "", facebook: "" },
+  gallery: [],
 };
 
 export type AdminUser = {
