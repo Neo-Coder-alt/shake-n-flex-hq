@@ -104,3 +104,21 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   social: { instagram: "", facebook: "" },
   gallery: [],
 };
+
+export type AdminUser = {
+  id: UUID;
+  name: string;
+  email: string;
+  password: string;
+  avatar?: string;
+};
+
+export type AppState = {
+  menu: MenuItem[];
+  categories: Category[];
+  orders: Order[];
+  reviews: Review[];
+  coupons: Coupon[];
+  settings: SiteSettings;
+  admin: AdminUser;
+};
