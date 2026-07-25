@@ -1,24 +1,30 @@
-import { setState, useAppState } from "./store";
+import { supabase } from "@/integrations/supabase/client";
+import { getState, reloadTable, useAppState } from "./store";
+import type { Database } from "@/integrations/supabase/types";
 import type { SiteSettings } from "./types";
+
+type SettingsInsert = Database["public"]["Tables"]["website_settings"]["Insert"];
 
 export function useSettings() {
   return useAppState((s) => s.settings);
 }
 
-export function updateSettings(patch: Partial<SiteSettings>) {
-  setState((s) => ({ ...s, settings: { ...s.settings, ...patch } }));
+export async function updateSettings(patch: Partial<SiteSettings>) {
+  const next: SiteSettings = { ...getState().settings, ...patch };
+  const row: SettingsInsert = {
+    id: "global",
+    data: next as unknown as SettingsInsert["data"],
+    updated_at: new Date().toISOString(),
+  };
+  const { error } = await supabase.from("website_settings").upsert(row, { onConflict: "id" });
+  if (error) console.error("[settings] update", error);
+  await reloadTable("website_settings");
 }
 
-export function addGalleryImage(dataUrl: string) {
-  setState((s) => ({
-    ...s,
-    settings: { ...s.settings, gallery: [dataUrl, ...s.settings.gallery] },
-  }));
+export async function addGalleryImage(url: string) {
+  await updateSettings({ gallery: [url, ...getState().settings.gallery] });
 }
 
-export function removeGalleryImage(url: string) {
-  setState((s) => ({
-    ...s,
-    settings: { ...s.settings, gallery: s.settings.gallery.filter((u) => u !== url) },
-  }));
+export async function removeGalleryImage(url: string) {
+  await updateSettings({ gallery: getState().settings.gallery.filter((u) => u !== url) });
 }
