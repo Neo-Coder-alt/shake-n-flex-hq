@@ -74,7 +74,9 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
     loading,
     signIn: async (email, password) => {
       const cleaned = email.trim();
-      let signInRes = await supabase.auth.signInWithPassword({ email: cleaned, password });
+      const signInRes = await supabase.auth.signInWithPassword({ email: cleaned, password });
+      let userId = signInRes.data?.user?.id;
+      let userEmail = signInRes.data?.user?.email;
       if (signInRes.error) {
         if (/invalid/i.test(signInRes.error.message)) {
           const { data: su, error: signUpErr } = await supabase.auth.signUp({
@@ -84,19 +86,20 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
           });
           if (signUpErr) return { ok: false, error: signUpErr.message };
           if (!su.session) return { ok: false, error: "Check your email to confirm your account, then sign in." };
-          signInRes = { data: { user: su.user, session: su.session }, error: null };
+          userId = su.user?.id;
+          userEmail = su.user?.email ?? undefined;
         } else {
           return { ok: false, error: signInRes.error.message };
         }
       }
-      const uid = signInRes.data?.user?.id;
+      const uid = userId;
       if (!uid) return { ok: false, error: "Sign-in failed." };
       const isAdmin = await verifyAdmin(uid);
       if (!isAdmin) {
         await supabase.auth.signOut();
         return { ok: false, error: "This account does not have admin access." };
       }
-      const s = await ensureProfile(uid, signInRes.data.user?.email ?? cleaned);
+      const s = await ensureProfile(uid, userEmail ?? cleaned);
       setUser(s);
       return { ok: true };
     },
@@ -116,7 +119,7 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
     },
     updateProfile: async (patch) => {
       if (!user) return;
-      const updates: Record<string, string> = {};
+      const updates: { name?: string; email?: string; avatar_url?: string } = {};
       if (patch.name !== undefined) updates.name = patch.name;
       if (patch.email !== undefined) updates.email = patch.email;
       if (patch.avatar !== undefined) updates.avatar_url = patch.avatar;
