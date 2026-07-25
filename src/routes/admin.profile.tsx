@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Save, Upload, User } from "lucide-react";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { useAdminAuth } from "@/lib/auth/admin-auth";
-import { getState } from "@/lib/data/store";
+import { uploadImage } from "@/lib/data/storage.service";
 
 export const Route = createFileRoute("/admin/profile")({
   component: ProfilePage,
@@ -11,10 +11,9 @@ export const Route = createFileRoute("/admin/profile")({
 
 function ProfilePage() {
   const { user, updateProfile, updatePassword } = useAdminAuth();
-  const admin = getState().admin;
-  const [name, setName] = useState(user?.name ?? admin.name);
-  const [email, setEmail] = useState(user?.email ?? admin.email);
-  const [avatar, setAvatar] = useState<string | undefined>(admin.avatar);
+  const [name, setName] = useState(user?.name ?? "");
+  const [email, setEmail] = useState(user?.email ?? "");
+  const [avatar, setAvatar] = useState<string | undefined>(user?.avatar);
   const [profileMsg, setProfileMsg] = useState<string | null>(null);
 
   const [current, setCurrent] = useState("");
@@ -22,23 +21,21 @@ function ProfilePage() {
   const [confirmPw, setConfirmPw] = useState("");
   const [pwMsg, setPwMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
-  const readFile = (f: File) => {
-    const r = new FileReader();
-    r.onload = () => setAvatar(r.result as string);
-    r.readAsDataURL(f);
+  const readFile = async (f: File) => {
+    try { setAvatar(await uploadImage(f, "avatars")); } catch (e) { console.error(e); }
   };
 
-  const saveProfile = (e: React.FormEvent) => {
+  const saveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    updateProfile({ name, email, avatar });
+    await updateProfile({ name, email, avatar });
     setProfileMsg("Profile updated");
     setTimeout(() => setProfileMsg(null), 2000);
   };
 
-  const changePassword = (e: React.FormEvent) => {
+  const changePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (next !== confirmPw) return setPwMsg({ ok: false, text: "Passwords do not match" });
-    const res = updatePassword(current, next);
+    const res = await updatePassword(current, next);
     setPwMsg({ ok: res.ok, text: res.ok ? "Password changed" : (res.error ?? "Failed") });
     if (res.ok) { setCurrent(""); setNext(""); setConfirmPw(""); }
   };

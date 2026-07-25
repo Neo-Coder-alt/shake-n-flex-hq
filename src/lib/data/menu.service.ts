@@ -1,4 +1,6 @@
-import { getState, newId, setState, useAppState } from "./store";
+import { supabase } from "@/integrations/supabase/client";
+import { menuToRow } from "./mappers";
+import { getState, reloadTable, useAppState } from "./store";
 import type { MenuItem } from "./types";
 
 export function listMenu() {
@@ -23,53 +25,38 @@ export function getMenuItem(id: string) {
   return getState().menu.find((m) => m.id === id);
 }
 
-export function upsertMenuItem(input: Partial<MenuItem> & { id?: string }) {
-  setState((s) => {
-    const idx = input.id ? s.menu.findIndex((m) => m.id === input.id) : -1;
-    if (idx >= 0) {
-      const next = [...s.menu];
-      next[idx] = { ...next[idx], ...input } as MenuItem;
-      return { ...s, menu: next };
-    }
-    const item: MenuItem = {
-      id: input.id ?? newId(),
-      name: input.name ?? "New Item",
-      description: input.description ?? "",
-      price: input.price ?? 0,
-      category: input.category ?? "Signature Shakes",
-      image: input.image,
-      sizes: input.sizes ?? [{ id: "reg", name: "Regular", priceDelta: 0 }],
-      toppings: input.toppings ?? [],
-      featured: input.featured ?? false,
-      available: input.available ?? true,
-      outOfStock: input.outOfStock ?? false,
-      createdAt: new Date().toISOString(),
-    };
-    return { ...s, menu: [item, ...s.menu] };
-  });
+export async function upsertMenuItem(input: Partial<MenuItem> & { id?: string }) {
+  const row = menuToRow(input);
+  const { error } = input.id
+    ? await supabase.from("menu").update(row).eq("id", input.id)
+    : await supabase.from("menu").insert(row);
+  if (error) console.error("[menu] upsert", error);
+  await reloadTable("menu");
 }
 
-export function deleteMenuItem(id: string) {
-  setState((s) => ({ ...s, menu: s.menu.filter((m) => m.id !== id) }));
+export async function deleteMenuItem(id: string) {
+  const { error } = await supabase.from("menu").delete().eq("id", id);
+  if (error) console.error("[menu] delete", error);
+  await reloadTable("menu");
 }
 
-export function toggleFeatured(id: string) {
-  setState((s) => ({
-    ...s,
-    menu: s.menu.map((m) => (m.id === id ? { ...m, featured: !m.featured } : m)),
-  }));
+export async function toggleFeatured(id: string) {
+  const it = getState().menu.find((m) => m.id === id); if (!it) return;
+  const { error } = await supabase.from("menu").update({ featured: !it.featured }).eq("id", id);
+  if (error) console.error("[menu] toggleFeatured", error);
+  await reloadTable("menu");
 }
 
-export function toggleAvailable(id: string) {
-  setState((s) => ({
-    ...s,
-    menu: s.menu.map((m) => (m.id === id ? { ...m, available: !m.available } : m)),
-  }));
+export async function toggleAvailable(id: string) {
+  const it = getState().menu.find((m) => m.id === id); if (!it) return;
+  const { error } = await supabase.from("menu").update({ available: !it.available }).eq("id", id);
+  if (error) console.error("[menu] toggleAvailable", error);
+  await reloadTable("menu");
 }
 
-export function toggleOutOfStock(id: string) {
-  setState((s) => ({
-    ...s,
-    menu: s.menu.map((m) => (m.id === id ? { ...m, outOfStock: !m.outOfStock } : m)),
-  }));
+export async function toggleOutOfStock(id: string) {
+  const it = getState().menu.find((m) => m.id === id); if (!it) return;
+  const { error } = await supabase.from("menu").update({ out_of_stock: !it.outOfStock }).eq("id", id);
+  if (error) console.error("[menu] toggleOutOfStock", error);
+  await reloadTable("menu");
 }

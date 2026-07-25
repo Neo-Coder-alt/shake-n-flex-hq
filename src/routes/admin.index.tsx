@@ -29,14 +29,10 @@ function AdminLogin() {
     navigate({ to: "/admin/dashboard" });
   };
 
-  const onForgot = (e: React.FormEvent) => {
+  const onForgot = async (e: React.FormEvent) => {
     e.preventDefault();
-    const res = requestPasswordReset(email);
-    setForgotMsg(
-      res.ok
-        ? `Reset token (demo): ${res.token}. In production this would be emailed.`
-        : (res.error ?? "Unable to send reset"),
-    );
+    const res = await requestPasswordReset(email);
+    setForgotMsg(res.ok ? "Password reset email sent. Check your inbox." : (res.error ?? "Unable to send reset"));
   };
 
   return (

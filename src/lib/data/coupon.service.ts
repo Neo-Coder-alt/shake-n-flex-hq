@@ -1,39 +1,37 @@
-import { getState, newId, setState, useAppState } from "./store";
+import { supabase } from "@/integrations/supabase/client";
+import { getState, reloadTable, useAppState } from "./store";
 import type { Coupon } from "./types";
 
 export function useCoupons() {
   return useAppState((s) => s.coupons);
 }
 
-export function upsertCoupon(input: Partial<Coupon> & { id?: string }) {
-  setState((s) => {
-    const idx = input.id ? s.coupons.findIndex((c) => c.id === input.id) : -1;
-    if (idx >= 0) {
-      const next = [...s.coupons];
-      next[idx] = { ...next[idx], ...input } as Coupon;
-      return { ...s, coupons: next };
-    }
-    const c: Coupon = {
-      id: input.id ?? newId(),
-      code: (input.code ?? "NEWCODE").toUpperCase(),
-      type: input.type ?? "percent",
-      value: input.value ?? 10,
-      expiresAt: input.expiresAt ?? new Date(Date.now() + 30 * 86400000).toISOString(),
-      active: input.active ?? true,
-    };
-    return { ...s, coupons: [c, ...s.coupons] };
-  });
+export async function upsertCoupon(input: Partial<Coupon> & { id?: string }) {
+  const row = {
+    code: (input.code ?? "NEWCODE").toUpperCase(),
+    type: input.type ?? "percent",
+    value: input.value ?? 10,
+    expires_at: input.expiresAt ?? new Date(Date.now() + 30 * 86400000).toISOString(),
+    active: input.active ?? true,
+  };
+  const { error } = input.id
+    ? await supabase.from("coupons").update(row).eq("id", input.id)
+    : await supabase.from("coupons").insert(row);
+  if (error) console.error("[coupons] upsert", error);
+  await reloadTable("coupons");
 }
 
-export function deleteCoupon(id: string) {
-  setState((s) => ({ ...s, coupons: s.coupons.filter((c) => c.id !== id) }));
+export async function deleteCoupon(id: string) {
+  const { error } = await supabase.from("coupons").delete().eq("id", id);
+  if (error) console.error("[coupons] delete", error);
+  await reloadTable("coupons");
 }
 
-export function toggleCouponActive(id: string) {
-  setState((s) => ({
-    ...s,
-    coupons: s.coupons.map((c) => (c.id === id ? { ...c, active: !c.active } : c)),
-  }));
+export async function toggleCouponActive(id: string) {
+  const c = getState().coupons.find((x) => x.id === id); if (!c) return;
+  const { error } = await supabase.from("coupons").update({ active: !c.active }).eq("id", id);
+  if (error) console.error("[coupons] toggle", error);
+  await reloadTable("coupons");
 }
 
 export function validateCoupon(code: string, subtotal: number) {
