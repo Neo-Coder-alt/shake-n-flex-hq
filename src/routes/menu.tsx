@@ -83,7 +83,13 @@ function MenuPage() {
             key={item.id}
             className="flex flex-col rounded-2xl border border-border bg-card p-5 transition hover:border-primary/50"
             style={{ boxShadow: "var(--shadow-card)" }}
-          >
+          >{item.image && (
+  <img
+    src={item.image}
+    alt={item.name}
+    className="mb-4 h-48 w-full rounded-xl object-cover"
+  />
+)}
             <div className="text-[11px] font-semibold uppercase tracking-widest text-primary">
               {item.category}
             </div>
